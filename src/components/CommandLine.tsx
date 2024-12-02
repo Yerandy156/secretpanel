@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { ChevronRight, Terminal, AlertTriangle } from 'lucide-react';
+import { ChevronRight, Terminal, AlertTriangle, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 
@@ -213,7 +213,7 @@ A state-of-the-art command-line interface for secure communication and system ma
     <div className="relative">
       {showMatrix && (
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="animate-matrix text-green-500 opacity-20 font-mono text-sm">
+          <div className="animate-matrix text-purple-500 opacity-20 font-mono text-sm">
             {Array.from({ length: 100 }).map((_, i) => (
               <div key={i} className="whitespace-nowrap">
                 {Array.from({ length: 50 }).map((_, j) => (
@@ -225,23 +225,10 @@ A state-of-the-art command-line interface for secure communication and system ma
         </div>
       )}
       
-      <div className="bg-black/90 rounded-lg border border-green-500/20 p-4 font-mono text-sm h-[60vh] flex flex-col relative">
-        <div className="flex items-center justify-between mb-4 text-green-400">
-          <div className="flex items-center space-x-2">
-            <Terminal className="w-5 h-5" />
-            <span>SecureNexus Terminal v2.0</span>
-          </div>
-          <button 
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-400 transition-colors"
-          >
-            ESC
-          </button>
-        </div>
-
+      <div className="bg-black/95 rounded-xl border border-purple-500/20 p-4 font-mono text-sm h-[60vh] flex flex-col relative">
         <div className="flex-1 overflow-auto space-y-2">
-          <div className="text-green-400 mb-4">
-            Welcome to SecureNexus Terminal
+          <div className="text-purple-400 mb-4">
+            Welcome to SecureNexus Terminal v2.0.0
             Type $help to see available commands
           </div>
 
@@ -254,7 +241,7 @@ A state-of-the-art command-line interface for secure communication and system ma
                 transition={{ duration: 0.2 }}
                 className="space-y-1"
               >
-                <div className="flex items-center space-x-2 text-green-400">
+                <div className="flex items-center space-x-2 text-purple-400">
                   <ChevronRight size={16} />
                   <span className="font-bold">{cmd.input}</span>
                 </div>
@@ -283,11 +270,11 @@ A state-of-the-art command-line interface for secure communication and system ma
 
         <div className="relative mt-4">
           {suggestions.length > 0 && (
-            <div className="absolute bottom-full mb-2 bg-gray-800 rounded-lg p-2 w-full">
+            <div className="absolute bottom-full mb-2 bg-gray-900 border border-purple-500/20 rounded-lg p-2 w-full">
               {suggestions.map((suggestion, i) => (
                 <div
                   key={i}
-                  className="px-2 py-1 hover:bg-gray-700 cursor-pointer rounded"
+                  className="px-2 py-1 hover:bg-purple-500/20 cursor-pointer rounded text-purple-400"
                   onClick={() => {
                     setCurrentInput(suggestion);
                     setSuggestions([]);
@@ -300,7 +287,7 @@ A state-of-the-art command-line interface for secure communication and system ma
             </div>
           )}
           
-          <div className="flex items-center space-x-2 text-green-400 border-t border-green-500/20 pt-4">
+          <div className="flex items-center space-x-2 text-purple-400 border-t border-purple-500/20 pt-4">
             <ChevronRight size={16} />
             <input
               ref={inputRef}
@@ -308,7 +295,7 @@ A state-of-the-art command-line interface for secure communication and system ma
               value={currentInput}
               onChange={handleInputChange}
               onKeyDown={handleKeyDown}
-              className="flex-1 bg-transparent outline-none text-green-400 placeholder-green-700"
+              className="flex-1 bg-transparent outline-none text-purple-400 placeholder-purple-900"
               placeholder="Enter command..."
               spellCheck={false}
               autoComplete="off"

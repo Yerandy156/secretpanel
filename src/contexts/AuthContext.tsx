@@ -4,11 +4,63 @@ import toast from 'react-hot-toast';
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+// Initial data that will always be present
+const INITIAL_USER: User = {
+  id: "rune-1234-5678",
+  agentId: "rune",
+  displayName: "Rune",
+  isCEO: true,
+  roles: [],
+  stats: {
+    postsCount: 1,
+    likesReceived: 0,
+    likesGiven: 0,
+    lastActive: new Date().toISOString(),
+    joinDate: new Date().toISOString(),
+    achievementsUnlocked: []
+  },
+  preferences: {
+    theme: 'dark',
+    fontSize: 'medium'
+  }
+};
+
+const INITIAL_POST = {
+  id: "post-1234-5678",
+  content: "Welcome to SecureNexus! I am Rune, the administrator.",
+  authorId: INITIAL_USER.id,
+  authorName: INITIAL_USER.displayName,
+  timestamp: new Date().toISOString(),
+  likes: [],
+};
+
+// Function to initialize data
+const initializeData = () => {
+  // Initialize users if empty
+  const users = JSON.parse(localStorage.getItem('users') || '[]');
+  if (!users.some((u: User) => u.agentId === 'rune')) {
+    users.push(INITIAL_USER);
+    localStorage.setItem('users', JSON.stringify(users));
+    // Set Rune's password
+    localStorage.setItem('password_rune', 'Yerandy2025');
+  }
+
+  // Initialize posts if empty
+  const posts = JSON.parse(localStorage.getItem('posts') || '[]');
+  if (!posts.some((p: any) => p.id === INITIAL_POST.id)) {
+    posts.push(INITIAL_POST);
+    localStorage.setItem('posts', JSON.stringify(posts));
+  }
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [impersonatedUser, setImpersonatedUser] = useState<User | null>(null);
 
   useEffect(() => {
+    // Initialize data when the app loads
+    initializeData();
+
     const storedUser = localStorage.getItem('user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
@@ -118,13 +170,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       if (normalizedAgentId === 'rune') {
-        const ceoExists = users.some((u: User) => u.isCEO);
-        if (ceoExists) {
-          throw new Error('CEO account already exists');
-        }
-        if (userData.password !== 'Yerandy2025') {
-          throw new Error('Invalid credentials for administrator account');
-        }
+        throw new Error('This agent ID is reserved');
       }
 
       const newUser: User = {
@@ -133,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         displayName: userData.displayName || userData.agentId!,
         avatar: userData.avatar,
         about: userData.about || '',
-        isCEO: normalizedAgentId === 'rune',
+        isCEO: false, // No one else can be CEO
         lastDisplayNameChange: new Date().toISOString(),
         roles: [],
         stats: {
@@ -157,7 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(newUser);
       localStorage.setItem('user', JSON.stringify(newUser));
       logActivity(newUser.id, 'REGISTER');
-      toast.success(newUser.isCEO ? 'Welcome, Administrator' : 'Welcome to the agency, Agent');
+      toast.success('Welcome to the agency, Agent');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Registration failed');
       throw error;
