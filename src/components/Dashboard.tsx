@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { LogOut, Home, User, Megaphone, ArrowLeft, FileText, Settings, EyeOff, Shield } from 'lucide-react';
 import PostForm from './PostForm';
@@ -197,8 +197,8 @@ export default function Dashboard() {
                 <PostList onProfileClick={handleProfileView} />
               </div>
             )}
-            {activeTab === 'profile' && (
-              <Profile userId={viewingUserId || user?.id || ''} onPostClick={handleProfileView} />
+            {activeTab === 'profile' && viewingUserId && (
+              <Profile userId={viewingUserId} onPostClick={handleProfileView} />
             )}
             {activeTab === 'announcements' && (
               <Announcements />

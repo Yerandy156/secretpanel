@@ -5,11 +5,9 @@ import { Toaster } from 'react-hot-toast';
 import AuthForm from './components/AuthForm';
 import Dashboard from './components/Dashboard';
 import { useAuth } from './contexts/AuthContext';
-import { useTheme } from './contexts/ThemeContext';
 
 function AppContent() {
   const { isAuthenticated } = useAuth();
-  const { theme } = useTheme();
 
   return isAuthenticated ? (
     <Dashboard />
