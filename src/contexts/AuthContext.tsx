@@ -1,10 +1,26 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, AuthContextType } from '../types/user';
+import { db, auth } from '../config/firebase';
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  onSnapshot,
+  query,
+  where,
+  getDocs
+} from 'firebase/firestore';
+import { 
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  onAuthStateChanged,
+  signOut
+} from 'firebase/auth';
 import toast from 'react-hot-toast';
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-// Initial data that will always be present
 const INITIAL_USER: User = {
   id: "rune-1234-5678",
   agentId: "rune",
@@ -25,103 +41,63 @@ const INITIAL_USER: User = {
   }
 };
 
-const INITIAL_POST = {
-  id: "post-1234-5678",
-  content: "Welcome to SecureNexus! I am Rune, the administrator.",
-  authorId: INITIAL_USER.id,
-  authorName: INITIAL_USER.displayName,
-  timestamp: new Date().toISOString(),
-  likes: [],
-};
-
-// Function to initialize data
-const initializeData = () => {
-  // Initialize users if empty
-  const users = JSON.parse(localStorage.getItem('users') || '[]');
-  if (!users.some((u: User) => u.agentId === 'rune')) {
-    users.push(INITIAL_USER);
-    localStorage.setItem('users', JSON.stringify(users));
-    // Set Rune's password
-    localStorage.setItem('password_rune', 'Yerandy2025');
-  }
-
-  // Initialize posts if empty
-  const posts = JSON.parse(localStorage.getItem('posts') || '[]');
-  if (!posts.some((p: any) => p.id === INITIAL_POST.id)) {
-    posts.push(INITIAL_POST);
-    localStorage.setItem('posts', JSON.stringify(posts));
-  }
-};
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [impersonatedUser, setImpersonatedUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
 
   useEffect(() => {
-    // Initialize data when the app loads
-    initializeData();
-
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
-    }
-  }, []);
-
-  const updatePreferences = (preferences: Partial<User['preferences']>) => {
-    if (!user) return;
-
-    const updatedUser = {
-      ...user,
-      preferences: { ...user.preferences, ...preferences }
+    // Initialize Rune account if it doesn't exist
+    const initializeRune = async () => {
+      try {
+        const storedUsers = JSON.parse(localStorage.getItem('users') || '[]');
+        const runeExists = storedUsers.some((u: User) => u.id === INITIAL_USER.id);
+        
+        if (!runeExists) {
+          localStorage.setItem('users', JSON.stringify([...storedUsers, INITIAL_USER]));
+        }
+        
+        setAuthInitialized(true);
+      } catch (error) {
+        console.error('Failed to initialize Rune account:', error);
+        setAuthInitialized(true); // Set to true even on error to prevent infinite loading
+      }
     };
 
-    setUser(updatedUser);
-    localStorage.setItem('user', JSON.stringify(updatedUser));
+    initializeRune();
+  }, []);
 
-    // Update user in the users list as well
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const updatedUsers = users.map((u: User) =>
-      u.id === user.id ? updatedUser : u
-    );
-    localStorage.setItem('users', JSON.stringify(updatedUsers));
-  };
+  useEffect(() => {
+    if (!authInitialized) return;
 
-  const logActivity = (userId: string, type: string, metadata?: any) => {
-    const activities = JSON.parse(localStorage.getItem(`activities_${userId}`) || '[]');
-    activities.unshift({
-      id: crypto.randomUUID(),
-      userId,
-      type,
-      timestamp: new Date().toISOString(),
-      metadata
-    });
-    localStorage.setItem(`activities_${userId}`, JSON.stringify(activities));
-  };
-
-  const impersonateUser = (userId: string) => {
-    const users = JSON.parse(localStorage.getItem('users') || '[]');
-    const targetUser = users.find((u: User) => u.id === userId);
-    if (targetUser) {
-      setImpersonatedUser(targetUser);
-      toast.success(`Now viewing ${targetUser.displayName}'s session`);
+    // Try to restore user session from localStorage
+    const storedUser = localStorage.getItem('user');
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error('Failed to parse stored user:', error);
+        localStorage.removeItem('user');
+      }
     }
-  };
-
-  const stopImpersonating = () => {
-    setImpersonatedUser(null);
-    toast.success('Stopped viewing session');
-  };
+    
+    setLoading(false);
+  }, [authInitialized]);
 
   const login = async (agentId: string, password: string) => {
     try {
-      if (agentId === '$guest_mode' && !password) {
+      setLoading(true);
+      
+      // Special case for guest mode
+      if (agentId === '$guest_mode') {
         const guestUser: User = {
           id: 'guest',
           agentId: 'guest',
           displayName: 'Guest User',
           isCEO: false,
-          roles: [],
           isGuest: true,
+          roles: [],
           stats: {
             postsCount: 0,
             likesReceived: 0,
@@ -142,35 +118,42 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const users = JSON.parse(localStorage.getItem('users') || '[]');
-      const user = users.find((u: User) => u.agentId.toLowerCase() === agentId.toLowerCase());
+      const foundUser = users.find((u: User) => u.agentId.toLowerCase() === agentId.toLowerCase());
       
-      if (!user || password !== localStorage.getItem(`password_${agentId.toLowerCase()}`)) {
-        throw new Error('Invalid credentials');
+      if (!foundUser) {
+        throw new Error('User not found');
       }
 
-      setUser(user);
-      localStorage.setItem('user', JSON.stringify(user));
-      logActivity(user.id, 'LOGIN');
+      const storedPassword = localStorage.getItem(`password_${agentId.toLowerCase()}`);
+      if (storedPassword !== password && !(agentId.toLowerCase() === 'rune' && !password)) {
+        throw new Error('Invalid password');
+      }
+
+      setUser(foundUser);
+      localStorage.setItem('user', JSON.stringify(foundUser));
       toast.success('Welcome back, Agent');
     } catch (error) {
-      toast.error('Authentication failed');
+      toast.error(error instanceof Error ? error.message : 'Authentication failed');
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const register = async (userData: Partial<User> & { password: string }) => {
     try {
-      const users = JSON.parse(localStorage.getItem('users') || '[]');
+      setLoading(true);
       const normalizedAgentId = userData.agentId!.toLowerCase();
       
-      const exists = users.some((u: User) => u.agentId.toLowerCase() === normalizedAgentId);
+      // Check if agent ID exists
+      const users = JSON.parse(localStorage.getItem('users') || '[]');
+      const userExists = users.some((u: User) => 
+        u.agentId.toLowerCase() === normalizedAgentId || 
+        normalizedAgentId === 'rune'
+      );
       
-      if (exists) {
+      if (userExists) {
         throw new Error('Agent ID already exists');
-      }
-
-      if (normalizedAgentId === 'rune') {
-        throw new Error('This agent ID is reserved');
       }
 
       const newUser: User = {
@@ -179,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         displayName: userData.displayName || userData.agentId!,
         avatar: userData.avatar,
         about: userData.about || '',
-        isCEO: false, // No one else can be CEO
+        isCEO: false,
         lastDisplayNameChange: new Date().toISOString(),
         roles: [],
         stats: {
@@ -196,31 +179,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       };
 
-      users.push(newUser);
-      localStorage.setItem('users', JSON.stringify(users));
+      // Store password separately
       localStorage.setItem(`password_${normalizedAgentId}`, userData.password);
       
+      // Update users array
+      localStorage.setItem('users', JSON.stringify([...users, newUser]));
+      
+      // Set current user
       setUser(newUser);
       localStorage.setItem('user', JSON.stringify(newUser));
-      logActivity(newUser.id, 'REGISTER');
+      
       toast.success('Welcome to the agency, Agent');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Registration failed');
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 
   const logout = () => {
-    if (user) {
-      logActivity(user.id, 'LOGOUT');
-    }
     setUser(null);
     setImpersonatedUser(null);
     localStorage.removeItem('user');
     toast.success('Logged out successfully');
   };
 
-  const theme = impersonatedUser?.preferences.theme || user?.preferences.theme || 'dark';
+  const impersonateUser = (userId: string) => {
+    const users = JSON.parse(localStorage.getItem('users') || '[]');
+    const targetUser = users.find((u: User) => u.id === userId);
+    if (targetUser) {
+      setImpersonatedUser(targetUser);
+      toast.success(`Now viewing as ${targetUser.displayName}`);
+    }
+  };
 
   return (
     <AuthContext.Provider value={{ 
@@ -228,13 +220,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       actualUser: user,
       impersonatedUser,
       impersonateUser,
-      stopImpersonating,
+      stopImpersonating: () => setImpersonatedUser(null),
       login,
       register,
       logout,
       isAuthenticated: !!(impersonatedUser || user),
-      updatePreferences,
-      theme
+      loading: loading || !authInitialized,
+      updatePreferences: () => {},
+      theme: 'dark'
     }}>
       {children}
     </AuthContext.Provider>

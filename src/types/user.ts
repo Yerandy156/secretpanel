@@ -41,6 +41,7 @@ export interface User {
   about?: string;
   lastDisplayNameChange?: string;
   isCEO: boolean;
+  isGuest?: boolean;
   banner?: string;
   roles: string[];  // Array of role IDs
   deletedAt?: string;
@@ -88,4 +89,5 @@ export interface AuthContextType {
   stopImpersonating: () => void;
   updatePreferences: (preferences: Partial<User['preferences']>) => void;
   theme: 'dark' | 'light';
+  loading: boolean;
 }

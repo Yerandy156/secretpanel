@@ -4,10 +4,15 @@ import { ThemeProvider } from './contexts/ThemeContext';
 import { Toaster } from 'react-hot-toast';
 import AuthForm from './components/AuthForm';
 import Dashboard from './components/Dashboard';
+import LoadingScreen from './components/LoadingScreen';
 import { useAuth } from './contexts/AuthContext';
 
 function AppContent() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
 
   return isAuthenticated ? (
     <Dashboard />
